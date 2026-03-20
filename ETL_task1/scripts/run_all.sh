@@ -18,12 +18,12 @@ echo "Sprawdzam wymagania..."
 
 MONGOSH=$(command -v mongosh 2>/dev/null || command -v mongosh.exe 2>/dev/null || where mongosh 2>/dev/null | head -1)
 if [ -z "$MONGOSH" ]; then
-    echo "BŁĄD: mongosh nie znaleziony. Zainstaluj MongoDB Shell."
+    echo "BŁĄD: mongosh nie znaleziony"
     exit 1
 fi
 
 if ! "$MONGOSH" --quiet --eval "db.adminCommand('ping')" &>/dev/null; then
-    echo "BŁĄD: Brak połączenia z MongoDB na localhost:27017. Czy serwer działa?"
+    echo "BŁĄD: Brak połączenia z MongoDB na localhost:27017"
     exit 1
 fi
 
@@ -76,7 +76,6 @@ if [ "$RAW_COUNT" -gt 0 ] 2>/dev/null; then
     echo "[Krok 0] Warstwa raw istnieje (raw_trips: $RAW_COUNT dokumentów) — pomijam ładowanie."
 else
     echo "[Krok 0] Warstwa raw pusta — ładowanie danych..."
-    echo "  Może to zająć 20-60 min dla ~10GB danych..."
     cd "$ROOT_DIR"
     "$PYTHON" scripts/load_data.py
     echo "  Dane załadowane."
@@ -84,7 +83,7 @@ fi
 
 # ─── Wyczyść warstwy clean i gold (raw zostaje) ──────────────────────────────
 echo ""
-echo "[Krok 0b] Usuwam warstwy clean + gold (warstwa raw zachowana)..."
+echo "[Krok 0b] Usuwam warstwy clean + gold"
 "$MONGOSH" --quiet "$DB_NAME" --eval "
 ['clean_trips','clean_zones','gold_zone_revenue','gold_hourly_demand','gold_top_routes']
     .forEach(c => { db[c].drop(); print('  dropped: ' + c); });
