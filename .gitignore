@@ -1,0 +1,10 @@
+# Large data files — do not commit
+ETL_task1/data/*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
