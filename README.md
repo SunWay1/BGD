@@ -21,7 +21,6 @@ Projekt implementuje pełny pipeline ETL oparty na architekturze 3-warstwowej (M
 | Źródło | NYC TLC Yellow Taxi Trip Records |
 | URL | <https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page> |
 | Zakres | 01.2022 – 12.2023 (miesięczne pliki Parquet) |
-| Licencja | Public domain (NYC Open Data) |
 | Uzupełnienie | taxi_zone_lookup.csv (265 stref geograficznych) |
 
 **Kluczowe pola:** `VendorID`, `tpep_pickup_datetime`, `tpep_dropoff_datetime`, `passenger_count`, `trip_distance`, `PULocationID`, `DOLocationID`, `fare_amount`, `tip_amount`, `total_amount`

@@ -1,0 +1,56 @@
+RYZYKA JAKOŚCI DANYCH — NYC Yellow Taxi 2022–2023
+==================================================
+
+RYZYKO 1 — Błędne wartości fare_amount i trip_distance (Ingestion)
+-------------------------------------------------------------------
+Opis:
+  Surowe dane zawierają przejazdy z fare_amount ujemnym lub równym zero,
+  a także trip_distance równym 0.0 lub przekraczającym 200 mil — wartości
+  fizycznie niemożliwe dla taksówki w Nowym Jorku.
+
+Wpływ:
+  Agregacje przychodów w warstwie gold są zaburzone. Średnia opłata per
+  strefa byłaby zaniżona lub całkowicie błędna bez wcześniejszego odfiltrowania.
+
+Mitygacja:
+  W warstwie clean odfiltrowane przez:
+    fare_amount > 0 AND fare_amount <= 500
+    trip_distance > 0 AND trip_distance <= 200
+
+
+RYZYKO 2 — Nieznane LocationID / osierocone klucze obce (Transformation)
+-------------------------------------------------------------------------
+Opis:
+  Rekordy przejazdów zawierają PULocationID lub DOLocationID o wartości
+  264 lub 265, które reprezentują strefy oznaczone jako "Unknown" —
+  nie mają odpowiednika w tabeli taxi_zone_lookup.csv.
+
+Wpływ:
+  Po operacji JOIN ($lookup) te rekordy zwracają pustą tablicę zamiast
+  nazwy strefy i wypadają z agregacji przychodów per strefa w warstwie gold.
+  Sumy przychodów dla stref pogranicza są tym samym zaniżone.
+
+Mitygacja:
+  W warstwie gold rekordy z pustym wynikiem $lookup są odfiltrowane:
+    { zone_info: { $ne: [] } }
+
+
+RYZYKO 3 — Schema drift między plikami miesięcznymi (Scale)
+-----------------------------------------------------------
+Opis:
+  NYC TLC dodawało nowe kolumny w kolejnych latach:
+    - congestion_surcharge: dodano w lutym 2019
+    - airport_fee: dodano w styczniu 2022
+  Pliki sprzed tych dat nie zawierają tych kolumn w ogóle.
+
+Wpływ:
+  Agregacja total_amount przez wiele lat jest niespójna — starsze rekordy
+  nie uwzględniają dopłat zawartych w nowszych. Porównania przychodów
+  między latami nie są miarodajne bez uwzględnienia tego faktu.
+  Dla zakresu 2022–2023 problem nie wystąpił, ale stanowi realne ryzyko
+  przy rozszerzeniu datasetu na wcześniejsze lata.
+
+Mitygacja:
+  W warstwie clean brakujące wartości uzupełniane zerami przez $ifNull:
+    congestion_surcharge: { $ifNull: ["$congestion_surcharge", 0] }
+    airport_fee:          { $ifNull: ["$airport_fee", 0] }
