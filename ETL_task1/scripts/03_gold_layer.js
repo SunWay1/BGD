@@ -1,12 +1,12 @@
-// 03_gold_layer.js — buduje warstwe gold: agregacje analityczne
+// 03_gold_layer.js - agregacje analityczne (warstwa gold)
 
-print("Usuwam stare kolekcje gold...");
+print("czyszcze stare kolekcje gold...");
 db.gold_zone_revenue.drop();
 db.gold_hourly_demand.drop();
 db.gold_top_routes.drop();
 
 // --- gold_zone_revenue ---
-// Przychód i statystyki per strefa odbioru, z nazwą strefy przez $lookup
+// przychod i statystyki per strefa odbioru, z nazwa strefy przez $lookup
 // SQL: SELECT z.Zone, SUM(total_amount), AVG(fare_amount) FROM trips JOIN zones ON PULocationID = LocationID GROUP BY PULocationID
 print("\ngold_zone_revenue...");
 
@@ -53,14 +53,14 @@ db.runCommand({
     cursor: {}
 });
 
-print(`Załadowano: ${db.gold_zone_revenue.countDocuments()} stref`);
-print("Top 5 stref wg przychodu:");
+print(`zaladowano: ${db.gold_zone_revenue.countDocuments()} stref`);
+print("top 5 wg przychodu:");
 db.gold_zone_revenue.find({}, { zone: 1, borough: 1, total_revenue: 1, trip_count: 1, _id: 0 })
     .sort({ total_revenue: -1 }).limit(5)
-    .forEach(d => print(`  ${d.zone} (${d.borough}): $${d.total_revenue.toLocaleString()} | ${d.trip_count.toLocaleString()} przejazdów`));
+    .forEach(d => print(`  ${d.zone} (${d.borough}): $${d.total_revenue.toLocaleString()} | ${d.trip_count.toLocaleString()} kursow`));
 
 // --- gold_hourly_demand ---
-// Popyt na przejazdy w podziale na godziny doby
+// popyt na przejazdy w podziale na godziny doby
 // SQL: SELECT pickup_hour, COUNT(*), AVG(trip_distance) FROM trips GROUP BY pickup_hour
 print("\ngold_hourly_demand...");
 
@@ -93,13 +93,13 @@ db.runCommand({
     cursor: {}
 });
 
-print("Godziny szczytu:");
+print("godziny szczytu:");
 db.gold_hourly_demand.find({}, { hour: 1, trip_count: 1, _id: 0 })
     .sort({ trip_count: -1 }).limit(3)
-    .forEach(d => print(`  ${d.hour}:00 — ${d.trip_count.toLocaleString()} przejazdów`));
+    .forEach(d => print(`  ${d.hour}:00 - ${d.trip_count.toLocaleString()} kursow`));
 
 // --- gold_top_routes ---
-// Najpopularniejsze trasy odbiór→docel, wymaga dwóch $lookup (po jednym dla każdej strefy)
+// najpopularniejsze trasy odbior->docel, dwa $lookup (po jednym dla kazdej strefy)
 // SQL: SELECT pu.Zone, do.Zone, COUNT(*) FROM trips JOIN zones pu ON PULocationID JOIN zones do ON DOLocationID GROUP BY PULocationID, DOLocationID HAVING COUNT(*) >= 1000
 print("\ngold_top_routes...");
 
@@ -140,8 +140,8 @@ db.runCommand({
     cursor: {}
 });
 
-print(`Załadowano: ${db.gold_top_routes.countDocuments()} tras (top 50)`);
-print("Top 5 tras:");
+print(`zaladowano: ${db.gold_top_routes.countDocuments()} tras (top 50)`);
+print("top 5:");
 db.gold_top_routes.find({}, { pickup_zone: 1, dropoff_zone: 1, trip_count: 1, _id: 0 })
     .sort({ trip_count: -1 }).limit(5)
     .forEach(d => print(`  ${d.pickup_zone} -> ${d.dropoff_zone}: ${d.trip_count.toLocaleString()}`));

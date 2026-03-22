@@ -1,9 +1,9 @@
-// 02_clean_layer.js — buduje warstwe clean z raw
+// 02_clean_layer.js - buduje warstwe clean z raw
 
-print("Usuwam stare kolekcje clean...");
+print("czyszcze stare kolekcje clean...");
 db.clean_zones.drop();
 
-// Normalizacja stref: EWR to lotnisko w New Jersey, dodajemy flagę is_airport
+// EWR to lotnisko w New Jersey, w danych jest blednie jako oddzielny borough
 db.runCommand({
     aggregate: "raw_zones",
     pipeline: [
@@ -18,9 +18,9 @@ db.runCommand({
     cursor: {}
 });
 
-print(`clean_zones: ${db.clean_zones.countDocuments()} dokumentów`);
+print(`clean_zones: ${db.clean_zones.countDocuments()} dokumentow`);
 
-print("\nBudowanie clean_trip");
+print("\nbuduje clean_trips...");
 
 db.runCommand({
     aggregate: "raw_trips",
@@ -36,7 +36,7 @@ db.runCommand({
                 tpep_dropoff_datetime: { $ne: null }
             }
         },
-        // dzięki czemu mniejsze dokumenty płyną przez kolejne etapy pipeline
+        // wczesny $project - mniejsze dokumenty przez kolejne etapy
         {
             $project: {
                 _id: 0,
@@ -46,7 +46,7 @@ db.runCommand({
                 pickup_hour: { $hour: "$tpep_pickup_datetime" },
                 pickup_date: { $dateToString: { format: "%Y-%m-%d", date: "$tpep_pickup_datetime" } },
                 pickup_year: { $year: "$tpep_pickup_datetime" },
-                // różnica timestampów w MongoDB jest w milisekundach
+                // roznica timestampow w MongoDB jest w milisekundach
                 trip_duration_min: {
                     $round: [{ $divide: [{ $subtract: ["$tpep_dropoff_datetime", "$tpep_pickup_datetime"] }, 60000] }, 1]
                 },
@@ -60,7 +60,7 @@ db.runCommand({
                 tip_amount: 1,
                 tip_pct: { $round: [{ $multiply: [{ $divide: ["$tip_amount", "$fare_amount"] }, 100] }, 1] },
                 total_amount: 1,
-                // starsze pliki nie mają tych kolumn
+                // starsze pliki nie maja tych kolumn
                 congestion_surcharge: { $ifNull: ["$congestion_surcharge", 0] },
                 airport_fee: { $ifNull: ["$airport_fee", 0] },
                 __sourceFile: 1
@@ -87,4 +87,4 @@ const raw = db.raw_trips.countDocuments();
 const clean = db.clean_trips.countDocuments();
 print(`\nraw_trips:   ${raw.toLocaleString()}`);
 print(`clean_trips: ${clean.toLocaleString()} (${((clean / raw) * 100).toFixed(1)}% zachowanych)`);
-print(`Odfiltrowano: ${(raw - clean).toLocaleString()} rekordów`);
+print(`odfiltrowano: ${(raw - clean).toLocaleString()} rekordow`);

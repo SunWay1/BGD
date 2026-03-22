@@ -8,7 +8,7 @@ BASE_URL="https://d37ci6vzurychx.cloudfront.net/trip-data"
 
 mkdir -p "$RAW_DIR"
 
-echo "Pobieranie NYC Yellow Taxi 01.2022 - 12.2023 do $RAW_DIR"
+echo "pobieranie NYC Yellow Taxi 2022-2023 do $RAW_DIR"
 echo ""
 
 for year in 2022 2023; do
@@ -17,28 +17,28 @@ for year in 2022 2023; do
         dest="$RAW_DIR/$filename"
 
         if [ -f "$dest" ]; then
-            echo "  [pomiń] $filename już istnieje"
+            echo "  [pomiń] $filename"
             continue
         fi
 
         echo "  [pobierz] $filename..."
         curl -f -L -o "$dest" "$BASE_URL/$filename" || {
-            echo "  [błąd] Nie udało się pobrać $filename — pomijam"
+            echo "  [blad] $filename — pomijam"
             rm -f "$dest"
         }
     done
 done
 
-# Plik słownika stref
+# slownik stref
 ZONES="$RAW_DIR/taxi_zone_lookup.csv"
 if [ ! -f "$ZONES" ]; then
     echo ""
     echo "  [pobierz] taxi_zone_lookup.csv..."
     curl -f -L -o "$ZONES" "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
 else
-    echo "  [pomiń] taxi_zone_lookup.csv już istnieje"
+    echo "  [pomiń] taxi_zone_lookup.csv"
 fi
 
 echo ""
-echo "Gotowe. Pliki w $RAW_DIR:"
+echo "pliki w $RAW_DIR:"
 ls -lh "$RAW_DIR"/*.parquet "$RAW_DIR"/*.csv 2>/dev/null | awk '{print "  " $5 "\t" $9}'
