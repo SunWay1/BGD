@@ -38,9 +38,3 @@ Projekt implementuje pełny pipeline ETL oparty na architekturze 3-warstwowej (M
 | Gold | `gold_zone_revenue` | Przychód i średnia opłata per strefa (JOIN + GROUP BY) |
 | Gold | `gold_hourly_demand` | Liczba przejazdów per godzina doby (GROUP BY) |
 | Gold | `gold_top_routes` | Top 50 tras odbiór→docel (GROUP BY + podwójny JOIN) |
-
-
-```js
-congestion_surcharge: { $ifNull: ["$congestion_surcharge", 0] },
-airport_fee:          { $ifNull: ["$airport_fee", 0] }
-```
