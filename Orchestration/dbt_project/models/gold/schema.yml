@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: gold_zone_revenue
+    description: "Revenue metrics aggregated by pickup zone."
+    columns:
+      - name: location_id
+        tests:
+          - not_null
+          - unique
+      - name: total_revenue
+        tests:
+          - not_null
+      - name: trip_count
+        tests:
+          - not_null
+
+  - name: gold_hourly_demand
+    description: "Trip demand aggregated by hour of day (0-23). Always 24 rows."
+    columns:
+      - name: pickup_hour
+        tests:
+          - not_null
+          - unique
+      - name: trip_count
+        tests:
+          - not_null
+
+  - name: gold_top_routes
+    description: "Top 50 most popular pickup-dropoff zone pairs."
+    columns:
+      - name: pu_location_id
+        tests:
+          - not_null
+      - name: do_location_id
+        tests:
+          - not_null
+      - name: trip_count
+        tests:
+          - not_null

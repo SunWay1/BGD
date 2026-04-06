@@ -1,0 +1,30 @@
+name: nyc_taxi_etl
+version: '1.0.0'
+config-version: 2
+
+profile: nyc_taxi
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target"]
+
+models:
+  nyc_taxi_etl:
+    clean:
+      +materialized: table
+    gold:
+      +materialized: table
+
+# All filter thresholds live here — change them without touching SQL files.
+# Mirrors config.py; keep both in sync when adjusting thresholds.
+vars:
+  filter_fare_min: 0
+  filter_fare_max: 500
+  filter_distance_min: 0
+  filter_distance_max: 200
+  filter_passenger_min: 1
+  filter_passenger_max: 8
+  filter_duration_min_minutes: 1
+  filter_duration_max_minutes: 300
+  gold_top_routes_min_trips: 1000
+  gold_top_routes_limit: 50

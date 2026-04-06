@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: clean_zones
+    description: "Taxi zones with corrected borough names and airport flag."
+    columns:
+      - name: LocationID
+        description: "Primary key — matches PULocationID/DOLocationID in clean_trips."
+        tests:
+          - not_null
+          - unique
+      - name: Borough
+        tests:
+          - not_null
+      - name: Zone
+        tests:
+          - not_null
+      - name: is_airport
+        tests:
+          - not_null
+
+  - name: clean_trips
+    description: >
+      Filtered NYC Yellow Taxi trips with derived time and payment fields.
+      Retains ~86% of raw trips after removing invalid fares, distances, and durations.
+    columns:
+      - name: PULocationID
+        description: "Pickup zone ID — foreign key to clean_zones.LocationID."
+        tests:
+          - not_null
+      - name: DOLocationID
+        description: "Dropoff zone ID — foreign key to clean_zones.LocationID."
+        tests:
+          - not_null
+      - name: fare_amount
+        tests:
+          - not_null
+      - name: pickup_hour
+        tests:
+          - not_null
+      - name: trip_duration_min
+        tests:
+          - not_null

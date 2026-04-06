@@ -1,0 +1,16 @@
+# dbt connection profile for DuckDB.
+#
+# The DuckDB file path is passed via DUCKDB_PATH env var, which pipeline.py sets
+# from config.py before invoking dbt. This avoids hardcoding an absolute path here.
+#
+# To run dbt manually:
+#   export DUCKDB_PATH=/path/to/Orchestration/taxi_etl.duckdb
+#   dbt run --project-dir Orchestration/dbt_project --profiles-dir Orchestration/dbt_project
+
+nyc_taxi:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH') }}"
+      schema: main

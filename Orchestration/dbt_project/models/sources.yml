@@ -1,0 +1,14 @@
+version: 2
+
+# Raw source tables are created in DuckDB by pipeline.py (create_duckdb_source_views task)
+# before dbt runs. raw_trips is a view over parquet files; raw_zones is a small table.
+
+sources:
+  - name: raw
+    schema: main
+    description: "Raw source data loaded from parquet files and CSV by the pipeline."
+    tables:
+      - name: raw_trips
+        description: "NYC Yellow Taxi trip records 2022-2023, ~13M rows."
+      - name: raw_zones
+        description: "NYC taxi zone lookup table, 265 zones."
