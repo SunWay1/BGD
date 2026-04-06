@@ -1,0 +1,7 @@
+prefect>=3.0.0
+duckdb>=1.1.0
+dbt-duckdb>=1.8.0
+pymongo>=4.6.0
+pandas>=2.0.0
+pyarrow>=14.0.0
+numpy>=1.26.0

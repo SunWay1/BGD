@@ -1,5 +1,13 @@
 # Large data files — do not commit
 ETL_task1/data/*
+Orchestration/data/*
+
+# DuckDB processing cache (auto-created by the orchestration pipeline)
+Orchestration/*.duckdb
+
+# dbt build artifacts (compiled SQL, run results, logs)
+Orchestration/dbt_project/target/
+Orchestration/dbt_project/logs/
 
 # Python
 __pycache__/
