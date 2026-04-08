@@ -15,6 +15,20 @@ Prerequisites:
 See Orchestration/architecture.md for the full pipeline diagram.
 """
 
+from mongodb_loader import (
+    get_database,
+    ensure_all_indexes,
+    upsert_clean_zones,
+    load_clean_trips,
+    upsert_gold_zone_revenue,
+    upsert_gold_hourly_demand,
+    upsert_gold_top_routes,
+    record_pipeline_run,
+)
+from duckdb_processor import TaxiDataProcessor
+from data_quality import assert_raw_layer_loaded, assert_clean_trips_retention
+import config
+from prefect import flow, task, get_run_logger
 import argparse
 import json
 import logging
@@ -27,21 +41,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from prefect import flow, task, get_run_logger
-
-import config
-from data_quality import assert_raw_layer_loaded, assert_clean_trips_retention
-from duckdb_processor import TaxiDataProcessor
-from mongodb_loader import (
-    get_database,
-    ensure_all_indexes,
-    upsert_clean_zones,
-    load_clean_trips,
-    upsert_gold_zone_revenue,
-    upsert_gold_hourly_demand,
-    upsert_gold_top_routes,
-    record_pipeline_run,
-)
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)-8s] %(name)s — %(message)s",
@@ -57,7 +56,8 @@ def validate_environment() -> None:
     """Checks parquet files, zones CSV, MongoDB, and dbt installation."""
     task_logger = get_run_logger()
 
-    parquet_files = sorted(config.RAW_DATA_DIR.glob("yellow_tripdata_*.parquet"))
+    parquet_files = sorted(
+        config.RAW_DATA_DIR.glob("yellow_tripdata_*.parquet"))
     if len(parquet_files) < config.EXPECTED_PARQUET_FILE_COUNT:
         raise FileNotFoundError(
             f"Expected {config.EXPECTED_PARQUET_FILE_COUNT} parquet files in "
@@ -117,7 +117,8 @@ def load_raw_to_mongodb(force: bool = False) -> dict:
     new_zones = db["raw_zones"].count_documents({})
 
     assert_raw_layer_loaded(new_trips, new_zones)
-    task_logger.info(f"Raw data loaded — trips: {new_trips:,}, zones: {new_zones}")
+    task_logger.info(
+        f"Raw data loaded — trips: {new_trips:,}, zones: {new_zones}")
     return {"raw_trips": new_trips, "raw_zones": new_zones, "loaded": True}
 
 
@@ -139,7 +140,8 @@ def create_duckdb_source_views() -> dict:
         proc.create_source_views()
         raw_count = proc.get_raw_trip_count()
 
-    task_logger.info(f"Source views ready — {raw_count:,} raw trips available to dbt")
+    task_logger.info(
+        f"Source views ready — {raw_count:,} raw trips available to dbt")
     return {"raw_trips": raw_count}
 
 
@@ -156,7 +158,8 @@ def run_dbt_transformations(force: bool = False) -> None:
     if not force:
         with TaxiDataProcessor() as proc:
             if proc.all_dbt_models_exist():
-                task_logger.info("All dbt models already exist — skipping. Use --force to rebuild.")
+                task_logger.info(
+                    "All dbt models already exist — skipping. Use --force to rebuild.")
                 return
 
     env = {**os.environ, "DUCKDB_PATH": str(config.DUCKDB_FILE)}
@@ -173,7 +176,8 @@ def run_dbt_transformations(force: bool = False) -> None:
     task_logger.info(result.stdout)
 
     if result.returncode != 0:
-        raise RuntimeError(f"dbt run failed:\n{result.stdout}\n{result.stderr}")
+        raise RuntimeError(
+            f"dbt run failed:\n{result.stdout}\n{result.stderr}")
 
 
 @task(name="run-dbt-tests")
@@ -196,15 +200,17 @@ def run_dbt_tests() -> None:
     task_logger.info(result.stdout)
 
     if result.returncode != 0:
-        raise RuntimeError(f"dbt test failed:\n{result.stdout}\n{result.stderr}")
+        raise RuntimeError(
+            f"dbt test failed:\n{result.stdout}\n{result.stderr}")
 
 
 @task(name="check-retention-rate")
 def check_retention_rate() -> None:
     """Checks clean_trips retention vs raw (ratio test — not covered by dbt tests)."""
     with TaxiDataProcessor() as proc:
-        raw_count   = proc.get_raw_trip_count()
-        clean_count = proc._conn.execute("SELECT count(*) FROM clean_trips").fetchone()[0]
+        raw_count = proc.get_raw_trip_count()
+        clean_count = proc._conn.execute(
+            "SELECT count(*) FROM clean_trips").fetchone()[0]
 
     assert_clean_trips_retention(raw_count, clean_count)
 
@@ -229,9 +235,11 @@ def load_processed_to_mongodb(force: bool = False, skip: bool = False) -> dict:
         upsert_clean_zones(db, zones_records)
         stats["clean_zones"] = len(zones_records)
 
-        task_logger.info("Loading clean_trips (may take a few minutes) ...")
-        inserted = load_clean_trips(db, proc.stream_records_in_batches("clean_trips"), force=force)
-        stats["clean_trips"] = inserted if inserted > 0 else db["clean_trips"].count_documents({})
+        task_logger.info("Loading clean_trips...")
+        inserted = load_clean_trips(
+            db, proc.stream_records_in_batches("clean_trips"), force=force)
+        stats["clean_trips"] = inserted if inserted > 0 else db["clean_trips"].count_documents({
+        })
 
         task_logger.info("Loading gold layer ...")
         zone_rev = proc.fetch_all_records("gold_zone_revenue")
@@ -266,16 +274,17 @@ def nyc_taxi_etl_pipeline(force: bool = False, duckdb_only: bool = False) -> dic
     """
     flow_logger = get_run_logger()
     t0 = time.time()
-    flow_logger.info(f"pipeline starting | force={force} | duckdb_only={duckdb_only}")
+    flow_logger.info(
+        f"pipeline starting | force={force} | duckdb_only={duckdb_only}")
 
     validate_environment()
-    raw_stats    = load_raw_to_mongodb(force=force)
+    raw_stats = load_raw_to_mongodb(force=force)
     ensure_mongodb_indexes()
     source_stats = create_duckdb_source_views()
     run_dbt_transformations(force=force)
     run_dbt_tests()
     check_retention_rate()
-    load_stats   = load_processed_to_mongodb(force=force, skip=duckdb_only)
+    load_stats = load_processed_to_mongodb(force=force, skip=duckdb_only)
 
     elapsed = round(time.time() - t0, 1)
     summary = {
@@ -323,7 +332,8 @@ def _parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = _parse_args()
-    result = nyc_taxi_etl_pipeline(force=args.force, duckdb_only=args.duckdb_only)
+    result = nyc_taxi_etl_pipeline(
+        force=args.force, duckdb_only=args.duckdb_only)
 
     print("\n" + "=" * 60)
     print("Pipeline summary")

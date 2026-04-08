@@ -11,7 +11,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 RAW_DATA_DIR = Path(os.getenv("RAW_DATA_DIR", str(Path(__file__).parent / "data" / "raw")))
-DUCKDB_FILE     = Path(__file__).parent / "taxi_etl.duckdb"   # git-ignored
+DUCKDB_FILE     = Path(os.getenv("DUCKDB_PATH", str(Path(__file__).parent / "taxi_etl.duckdb")))
 DBT_PROJECT_DIR = Path(__file__).parent / "dbt_project"
 
 MONGO_URI     = os.getenv("MONGO_URI",     "mongodb://localhost:27017")
