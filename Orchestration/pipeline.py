@@ -10,7 +10,7 @@ Run from the repo root:
 Prerequisites:
     pip install -r Orchestration/requirements.txt
     MongoDB running (default localhost:27017, override with MONGO_URI env var)
-    24 parquet files in ETL_task1/data/raw/  (run ETL_task1/scripts/download_data.sh if missing)
+    24 parquet files in Orchestration/data/raw/  (run Orchestration/download_data.sh if missing)
 
 See Orchestration/architecture.md for the full pipeline diagram.
 """
@@ -62,7 +62,7 @@ def validate_environment() -> None:
         raise FileNotFoundError(
             f"Expected {config.EXPECTED_PARQUET_FILE_COUNT} parquet files in "
             f"{config.RAW_DATA_DIR}, found {len(parquet_files)}.\n"
-            f"Run: bash ETL_task1/scripts/download_data.sh"
+            f"Run: bash Orchestration/download_data.sh"
         )
 
     zones_csv = config.RAW_DATA_DIR / config.ZONES_CSV_FILENAME

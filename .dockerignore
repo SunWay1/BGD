@@ -1,4 +1,3 @@
-ETL_task1/
 Orchestration/data/
 Orchestration/*.duckdb
 Orchestration/dbt_project/target/

@@ -15,7 +15,7 @@ a Medallion Architecture (Raw → Clean → Gold).
 
 ```mermaid
 flowchart TD
-    subgraph SRC["Source Data  (ETL_task1/data/raw/)"]
+    subgraph SRC["Source Data  (Orchestration/data/raw/)"]
         P["yellow_tripdata_YYYY-MM.parquet\n24 monthly files"]
         Z["taxi_zone_lookup.csv\n265 NYC taxi zones"]
     end
