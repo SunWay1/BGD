@@ -1,4 +1,4 @@
-# BGD — ETL Zadanie 1: Analiza przejazdów NYC Yellow Taxi
+# BGD — Analiza przejazdów NYC Yellow Taxi
 
 ## Problem Statement
 
