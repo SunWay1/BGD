@@ -3,7 +3,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RAW_DIR="$(dirname "$SCRIPT_DIR")/data/raw"
+RAW_DIR="$SCRIPT_DIR/data/raw"
 BASE_URL="https://d37ci6vzurychx.cloudfront.net/trip-data"
 
 mkdir -p "$RAW_DIR"
@@ -29,7 +29,6 @@ for year in 2022 2023; do
     done
 done
 
-# slownik stref
 ZONES="$RAW_DIR/taxi_zone_lookup.csv"
 if [ ! -f "$ZONES" ]; then
     echo ""

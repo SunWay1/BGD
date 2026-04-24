@@ -1,0 +1,65 @@
+services:
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      PREFECT_UI_API_URL: http://localhost:4200/api
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  etl-pipeline:
+    build:
+      context: Orchestration
+      dockerfile: Dockerfile
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      prefect-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB_NAME: bgd_taxidb
+      RAW_DATA_DIR: /app/data/raw
+      DUCKDB_PATH: /app/taxi_etl.duckdb
+      PREFECT_API_URL: http://prefect-server:4200/api
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./Orchestration/data/raw:/app/data/raw:ro
+      - ./Orchestration/dbt_project/target:/app/dbt_project/target
+      - duckdb_cache:/app
+
+volumes:
+  mongodb_data:
+  duckdb_cache:

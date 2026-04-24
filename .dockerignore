@@ -1,0 +1,8 @@
+Orchestration/data/
+Orchestration/*.duckdb
+Orchestration/dbt_project/target/
+Orchestration/dbt_project/logs/
+__pycache__/
+*.pyc
+.venv/
+.git/

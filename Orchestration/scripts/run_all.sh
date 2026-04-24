@@ -84,7 +84,7 @@ if [ "$RAW_COUNT" -gt 0 ] 2>/dev/null; then
 else
     echo "[0] laduje dane do warstwy raw..."
     cd "$ROOT_DIR"
-    "$PYTHON" scripts/load_data.py
+    "$PYTHON" load_raw_data.py
     echo "  gotowe"
 fi
 
@@ -97,6 +97,8 @@ if [ "$CLEAN" = true ]; then
     .forEach(c => { db[c].drop(); print('  dropped: ' + c); });
 "
 fi
+
+cd "$ROOT_DIR"
 
 # krok 1 - weryfikacja raw
 echo ""
