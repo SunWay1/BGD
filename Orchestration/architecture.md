@@ -6,6 +6,7 @@ a Medallion Architecture (Raw → Clean → Gold).
 | Component | Technology |
 | --------- | ---------- |
 | Orchestration | [Prefect 3](https://docs.prefect.io/) — tasks, retries, logging |
+| Message Queue | [Redis Streams](https://redis.io/docs/data-types/streams/) — decouples data ingestion from storage |
 | Transformations | [dbt](https://docs.getdbt.com/) + [DuckDB](https://duckdb.org/) — SQL models over parquet |
 | Storage | MongoDB — all three layers |
 
@@ -15,82 +16,39 @@ a Medallion Architecture (Raw → Clean → Gold).
 
 ```mermaid
 flowchart TD
-    subgraph SRC["Source Data  (Orchestration/data/raw/)"]
-        P["yellow_tripdata_YYYY-MM.parquet\n24 monthly files"]
-        Z["taxi_zone_lookup.csv\n265 NYC taxi zones"]
+    SRC["Source Files"]
+
+    PREFECT["Prefect\norchestrates all tasks"]
+
+    subgraph STAGE1["① Raw — load into MongoDB"]
+        direction LR
+        Q_RAW["Redis Streams\nstream:raw:trips\nstream:raw:zones\n─────────────────\ntransient buffer\nfile-by-file"]
+        MONGO_RAW["MongoDB · bgd_taxidb\n─────────────────\nraw_trips\nraw_zones"]
+        Q_RAW -->|consume| MONGO_RAW
     end
 
-    subgraph ORCH["Prefect  (Orchestration/pipeline.py)"]
-        direction TB
-        T1["① validate_environment"]
-        T2["② load_raw_to_mongodb"]
-        T3["③ ensure_mongodb_indexes"]
-        T4["④ create_duckdb_source_views"]
-        T5["⑤ run_dbt_transformations"]
-        T6["⑥ run_dbt_tests"]
-        T7["⑦ check_retention_rate"]
-        T8["⑧ load_processed_to_mongodb"]
-        T9["⑨ record_pipeline_run"]
-
-        T1 --> T2 --> T3 --> T4 --> T5 --> T6 --> T7 --> T8 --> T9
+    subgraph STAGE2["② Transform — DuckDB + dbt"]
+        direction LR
+        DDB_SRC["DuckDB\n─────────────────\nraw_trips  VIEW\nraw_zones  TABLE"]
+        DBT["dbt models\n─────────────────\nclean/\ngold/"]
+        DDB_OUT["DuckDB output\n─────────────────\nclean_trips\nclean_zones\ngold_zone_revenue\ngold_hourly_demand\ngold_top_routes"]
+        DDB_SRC --> DBT --> DDB_OUT
     end
 
-    subgraph DBT["dbt models  (Orchestration/dbt_project/models/)"]
-        direction TB
-        subgraph CLEAN["clean/"]
-            CZ["clean_zones.sql\nEWR fix, is_airport flag"]
-            CT["clean_trips.sql\nfilters + derived fields"]
-        end
-        subgraph GOLD["gold/"]
-            GZR["gold_zone_revenue.sql"]
-            GHD["gold_hourly_demand.sql"]
-            GTR["gold_top_routes.sql"]
-        end
-
-        CZ --> GZR
-        CZ --> GTR
-        CT --> GZR
-        CT --> GHD
-        CT --> GTR
+    subgraph STAGE3["③ Load — Clean & Gold into MongoDB"]
+        direction LR
+        Q_PROC["Redis Streams\nstream:clean:*\nstream:gold:*\n─────────────────\ntransient buffer\nbatch-by-batch"]
+        MONGO_CG["MongoDB · bgd_taxidb\n─────────────────\nclean_trips · clean_zones\ngold_zone_revenue\ngold_hourly_demand\ngold_top_routes"]
+        Q_PROC -->|consume| MONGO_CG
     end
 
-    subgraph DUCK["DuckDB  (taxi_etl.duckdb)"]
-        RTV["raw_trips VIEW\nover parquet files"]
-        RTB["raw_zones TABLE\nfrom CSV"]
-    end
+    SRC -->|"publish  (file-by-file)"| Q_RAW
+    SRC -->|"read_parquet glob\n(zero-copy)"| DDB_SRC
+    DDB_OUT -->|publish| Q_PROC
 
-    subgraph MONGO["MongoDB  (bgd_taxidb)"]
-        direction TB
-        subgraph RAW["Raw Layer"]
-            MRT["raw_trips"]
-            MRZ["raw_zones"]
-        end
-        subgraph CLN["Clean Layer"]
-            MCZ["clean_zones\nupsert by LocationID"]
-            MCT["clean_trips\nbulk insert (guarded)"]
-        end
-        subgraph GLD["Gold Layer"]
-            MGZR["gold_zone_revenue\nupsert by location_id"]
-            MGHD["gold_hourly_demand\nupsert by pickup_hour"]
-            MGTR["gold_top_routes\nupsert by (pu,do)_location_id"]
-        end
-        MPR["pipeline_runs, audit log"]
-    end
-
-    P -- "read_parquet()" --> RTV
-    Z -- "read_csv_auto()" --> RTB
-    RTV -- "source('raw','raw_trips')" --> CT
-    RTB -- "source('raw','raw_zones')" --> CZ
-
-    P -- "subprocess: load_data.py" --> MRT
-    Z -- "subprocess: load_data.py" --> MRZ
-
-    CZ -- "upsert" --> MCZ
-    CT -- "bulk insert" --> MCT
-    GZR -- "upsert" --> MGZR
-    GHD -- "upsert" --> MGHD
-    GTR -- "upsert" --> MGTR
-    T9 -- "insert" --> MPR
+    PREFECT -.->|controls| STAGE1
+    PREFECT -.->|controls| STAGE2
+    PREFECT -.->|controls| STAGE3
 ```
 
 ---

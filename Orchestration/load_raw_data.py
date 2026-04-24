@@ -1,29 +1,30 @@
 """
-load_raw_data.py — loads raw source data into MongoDB:
-  - taxi_zone_lookup.csv    -> raw_zones
-  - yellow_tripdata_*.parquet -> raw_trips
+load_raw_data.py — reads raw source files and publishes them to Redis Streams.
+
+  - taxi_zone_lookup.csv         -> stream:raw:zones
+  - yellow_tripdata_*.parquet    -> stream:raw:trips
+
+The pipeline consumer task reads from those streams and writes to MongoDB.
 """
 
 import csv
 import glob
 import os
 import pandas as pd
-import pymongo
+import redis
 from pathlib import Path
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-DB_NAME   = os.getenv("MONGO_DB_NAME", "bgd_taxidb")
-DATA_DIR  = Path(os.getenv("RAW_DATA_DIR", str(Path(__file__).parent / "data" / "raw")))
-BATCH_SIZE = 10_000
+import redis_queue
+
+DATA_DIR   = Path(os.getenv("RAW_DATA_DIR", str(Path(__file__).parent / "data" / "raw")))
+BATCH_SIZE = 10_000  # records per Redis stream entry
 
 
-def load_zones(db):
+def publish_zones(client: redis.Redis) -> int:
     csv_path = DATA_DIR / "taxi_zone_lookup.csv"
     if not csv_path.exists():
         print(f"ERROR: {csv_path} not found")
-        return
-
-    db["raw_zones"].drop()
+        return 0
 
     with open(csv_path, newline="", encoding="utf-8") as f:
         records = list(csv.DictReader(f))
@@ -31,51 +32,46 @@ def load_zones(db):
     for row in records:
         row["LocationID"] = int(row["LocationID"])
 
-    db["raw_zones"].insert_many(records)
-    print(f"raw_zones: {len(records)} zones loaded")
+    count = redis_queue.publish(client, redis_queue.STREAM_RAW_ZONES, records)
+    print(f"raw_zones: {count} zones published to queue")
+    return count
 
 
-def load_trips(db):
-    parquet_files = sorted(glob.glob(str(DATA_DIR / "yellow_tripdata_*.parquet")))
-    if not parquet_files:
-        print("No parquet files found in", DATA_DIR)
-        return
+def publish_file(client: redis.Redis, filepath: Path) -> int:
+    """Publishes a single parquet file to the raw trips stream."""
+    filename = filepath.name
+    df = pd.read_parquet(filepath)
+    df["__sourceFile"] = filename
 
-    print(f"Found {len(parquet_files)} parquet files")
-    col = db["raw_trips"]
+    for col_name in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col_name]):
+            df[col_name] = pd.to_datetime(df[col_name], utc=False).dt.to_pydatetime()
+
+    records = df.to_dict("records")
+    return redis_queue.publish(client, redis_queue.STREAM_RAW_TRIPS, records, batch_size=BATCH_SIZE)
+
+
+def publish_trips(client: redis.Redis) -> int:
+    """Publishes all parquet files from DATA_DIR to the raw trips stream."""
+    files = sorted(DATA_DIR.glob("yellow_tripdata_*.parquet"))
+    if not files:
+        print(f"ERROR: no parquet files found in {DATA_DIR}")
+        return 0
+
     total = 0
-
-    for filepath in parquet_files:
-        filename = Path(filepath).name
-        print(f"\nLoading {filename}...")
-
-        df = pd.read_parquet(filepath)
-        df["__sourceFile"] = filename
-
-        for col_name in df.columns:
-            if pd.api.types.is_datetime64_any_dtype(df[col_name]):
-                df[col_name] = pd.to_datetime(df[col_name], utc=False).dt.to_pydatetime()
-
-        records = df.to_dict("records")
-
-        for i in range(0, len(records), BATCH_SIZE):
-            col.insert_many(records[i : i + BATCH_SIZE], ordered=False)
-
-        total += len(records)
-        print(f"  {len(records):,} records")
-
-    print(f"\nTotal loaded: {total:,} documents")
-    print(f"raw_trips count: {col.count_documents({}):,}")
+    for filepath in files:
+        count = publish_file(client, filepath)
+        print(f"  {filepath.name}: {count} records published")
+        total += count
+    print(f"raw_trips: {total} total records published to queue")
+    return total
 
 
 if __name__ == "__main__":
-    client = pymongo.MongoClient(MONGO_URI)
-    db = client[DB_NAME]
+    client = redis_queue.get_client()
 
     print("--- Zones (CSV) ---")
-    load_zones(db)
+    publish_zones(client)
 
     print("\n--- Trips (Parquet) ---")
-    load_trips(db)
-
-    client.close()
+    publish_trips(client)

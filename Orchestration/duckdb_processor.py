@@ -95,18 +95,15 @@ class TaxiDataProcessor:
         table_name: str,
         batch_size: int = MONGO_INSERT_BATCH_SIZE,
     ) -> Generator[list[dict], None, None]:
-        """Yields rows in batches of dicts. Use for large tables (clean_trips ~11M rows)."""
-        offset = 0
+        """
+        Yields rows in batches of dicts using a cursor so each fetchmany()
+        continues from where the previous one left off — O(n) total instead
+        of the O(n²) you'd get with LIMIT/OFFSET pagination.
+        """
+        cursor = self._conn.execute(f"SELECT * FROM {table_name}")
+        columns = [desc[0] for desc in cursor.description]
         while True:
-            df: pd.DataFrame = self._conn.execute(
-                f"SELECT * FROM {table_name} LIMIT {batch_size} OFFSET {offset}"
-            ).fetchdf()
-
-            if df.empty:
+            rows = cursor.fetchmany(batch_size)
+            if not rows:
                 break
-
-            yield df.to_dict("records")
-            offset += batch_size
-
-            if len(df) < batch_size:
-                break
+            yield [dict(zip(columns, row)) for row in rows]

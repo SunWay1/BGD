@@ -116,7 +116,7 @@ def load_clean_trips(
 
     total_inserted = 0
     for batch in record_batches:
-        clean = _sanitize_for_mongo(batch)
+        clean = sanitize_records(batch)
         collection.insert_many(clean, ordered=False)
         total_inserted += len(clean)
         if total_inserted % 500_000 == 0:
@@ -169,7 +169,7 @@ def _bulk_upsert(collection, records: list[dict], key_fields: list[str], label: 
     return summary
 
 
-def _sanitize_for_mongo(records: list[dict]) -> list[dict]:
+def sanitize_records(records: list[dict]) -> list[dict]:
     """Converts numpy/pandas scalars to Python natives for BSON compatibility."""
     def _convert(value):
         if isinstance(value, np.integer):
