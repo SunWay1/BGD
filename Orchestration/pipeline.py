@@ -41,6 +41,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -343,6 +344,36 @@ def consume_processed_from_queue(produce_result: dict) -> dict:
     return stats
 
 
+@task(name="export-gold-to-csv")
+def export_gold_to_csv(load_stats: dict) -> dict:
+    """Exports the three gold MongoDB collections to CSV files in data_product/."""
+    task_logger = get_run_logger()
+
+    if load_stats.get("skipped"):
+        task_logger.info("MongoDB load was skipped — nothing to export.")
+        return {"skipped": True}
+
+    db = get_database()
+    out_dir = config.PROJECT_ROOT / "data_product"
+    out_dir.mkdir(exist_ok=True)
+
+    exports = {
+        "gold_zone_revenue":  out_dir / "gold_zone_revenue.csv",
+        "gold_hourly_demand": out_dir / "gold_hourly_demand.csv",
+        "gold_top_routes":    out_dir / "gold_top_routes.csv",
+        "clean_zones":        out_dir / "zone_lookup.csv",
+    }
+
+    stats = {}
+    for collection, path in exports.items():
+        docs = list(db[collection].find({}, {"_id": 0}))
+        pd.DataFrame(docs).to_csv(path, index=False)
+        stats[collection] = len(docs)
+        task_logger.info(f"Exported {len(docs)} rows → {path.name}")
+
+    return stats
+
+
 @flow(
     name="nyc-taxi-etl-pipeline",
     description=(
@@ -373,16 +404,18 @@ def nyc_taxi_etl_pipeline(force: bool = False, duckdb_only: bool = False) -> dic
 
     processed_produce = produce_processed_to_queue(force=force, skip=duckdb_only)
     load_stats        = consume_processed_from_queue(processed_produce)
+    export_stats      = export_gold_to_csv(load_stats)
 
     elapsed = round(time.time() - t0, 1)
     summary = {
-        "status":          "SUCCESS",
-        "elapsed_seconds": elapsed,
-        "force":           force,
-        "duckdb_only":     duckdb_only,
-        "raw":             raw_stats,
-        "source":          source_stats,
-        "mongodb_load":    load_stats,
+        "status":           "SUCCESS",
+        "elapsed_seconds":  elapsed,
+        "force":            force,
+        "duckdb_only":      duckdb_only,
+        "raw":              raw_stats,
+        "source":           source_stats,
+        "mongodb_load":     load_stats,
+        "csv_export":       export_stats,
     }
 
     if not duckdb_only:

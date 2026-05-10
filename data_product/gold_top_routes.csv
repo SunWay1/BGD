@@ -1,0 +1,51 @@
+pu_location_id,do_location_id,pickup_zone,dropoff_zone,trip_count,avg_fare,avg_distance_miles
+237,236,Upper East Side South,Upper East Side North,494691,7.82,1.09
+236,237,Upper East Side North,Upper East Side South,419671,8.4,1.07
+264,264,N/A,N/A,411514,17.91,3.59
+237,237,Upper East Side South,Upper East Side South,321544,6.55,0.68
+236,236,Upper East Side North,Upper East Side North,306511,6.01,0.67
+237,161,Upper East Side South,Midtown Center,221892,9.15,1.09
+161,237,Midtown Center,Upper East Side South,215568,8.97,1.1
+142,239,Lincoln Square East,Upper West Side South,188557,7.22,1.02
+161,236,Midtown Center,Upper East Side North,188491,12.44,1.98
+239,142,Upper West Side South,Lincoln Square East,182550,6.94,0.9
+239,238,Upper West Side South,Upper West Side North,178144,6.43,0.86
+237,162,Upper East Side South,Midtown East,174629,8.36,1.0
+141,236,Lenox Hill West,Upper East Side North,169517,7.86,1.12
+132,230,JFK Airport,Times Sq/Theatre District,169169,62.04,18.25
+236,161,Upper East Side North,Midtown Center,168029,13.05,1.96
+142,238,Lincoln Square East,Upper West Side North,151162,8.96,1.52
+186,230,Penn Station/Madison Sq West,Times Sq/Theatre District,149613,11.02,1.08
+238,239,Upper West Side North,Upper West Side South,149139,6.36,0.81
+162,237,Midtown East,Upper East Side South,148677,8.34,1.04
+186,161,Penn Station/Madison Sq West,Midtown Center,148015,11.2,1.29
+236,141,Upper East Side North,Lenox Hill West,146980,8.7,1.14
+236,239,Upper East Side North,Upper West Side South,146171,9.38,1.47
+48,68,Clinton East,East Chelsea,145240,7.99,1.18
+263,141,Yorkville West,Lenox Hill West,145182,6.7,0.95
+237,141,Upper East Side South,Lenox Hill West,143743,6.94,0.79
+142,237,Lincoln Square East,Upper East Side South,139052,9.36,1.36
+237,142,Upper East Side South,Lincoln Square East,137326,9.72,1.32
+138,230,LaGuardia Airport,Times Sq/Theatre District,135984,43.8,10.39
+141,237,Lenox Hill West,Upper East Side South,135621,6.92,0.75
+237,263,Upper East Side South,Yorkville West,135552,8.12,1.23
+239,236,Upper West Side South,Upper East Side North,135315,9.7,1.52
+263,236,Yorkville West,Upper East Side North,134246,6.09,0.7
+236,238,Upper East Side North,Upper West Side North,133917,9.36,1.46
+161,234,Midtown Center,Union Sq,133887,10.36,1.47
+107,170,Gramercy,Murray Hill,129631,7.64,1.0
+236,162,Upper East Side North,Midtown East,129026,12.08,1.81
+162,236,Midtown East,Upper East Side North,128634,11.6,1.85
+140,236,Lenox Hill East,Upper East Side North,128367,9.05,1.31
+132,265,JFK Airport,Outside of NYC,126914,97.46,21.93
+142,236,Lincoln Square East,Upper East Side North,126765,12.03,2.12
+161,164,Midtown Center,Midtown South,125477,8.61,0.99
+230,186,Times Sq/Theatre District,Penn Station/Madison Sq West,122504,8.84,1.03
+163,236,Midtown North,Upper East Side North,122134,11.19,1.77
+236,142,Upper East Side North,Lincoln Square East,119615,11.87,1.97
+237,140,Upper East Side South,Lenox Hill East,118192,8.01,0.94
+163,237,Midtown North,Upper East Side South,117742,8.11,0.99
+234,170,Union Sq,Murray Hill,117545,8.29,1.03
+141,263,Lenox Hill West,Yorkville West,117153,6.82,1.05
+238,142,Upper West Side North,Lincoln Square East,117047,8.95,1.39
+262,236,Yorkville East,Upper East Side North,115865,7.14,0.89

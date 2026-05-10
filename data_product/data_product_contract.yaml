@@ -1,0 +1,408 @@
+---
+# =============================================================================
+# DATA PRODUCT CONTRACT — NYC Yellow Taxi Analytics 2022-2023
+# =============================================================================
+
+product:
+  purpose: >
+    Provide a clean, aggregated view of NYC Yellow Taxi trip data for 2022-2023
+    to answer two analytical questions:
+      1. Which NYC taxi zones generate the most revenue?
+      2. How does trip demand vary by hour of day?
+    The product covers ~12 million cleaned trips across 265 taxi zones, stored
+    in MongoDB with pre-computed gold-layer aggregations ready for direct query
+    and visualization.
+
+# -----------------------------------------------------------------------------
+# DATA SOURCES
+# -----------------------------------------------------------------------------
+
+sources:
+  - name: "NYC TLC Yellow Taxi Trip Records"
+    type: "Parquet files (monthly)"
+    url: "https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page"
+    files: 24
+    date_range: "2022-01 through 2023-12"
+    raw_row_count: ~13_000_000
+
+  - name: "NYC Taxi Zone Lookup"
+    type: "CSV"
+    url: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
+    row_count: 265
+    description: "Maps LocationID to Borough, Zone name, and service zone."
+
+# -----------------------------------------------------------------------------
+# PIPELINE ARCHITECTURE
+# -----------------------------------------------------------------------------
+
+pipeline:
+  orchestration: "Prefect 3"
+  queue: "Redis Streams"
+  transformation: "dbt + DuckDB"
+  storage: "MongoDB 7"
+  containerization: "Docker Compose"
+  repository: "https://github.com/SunWay1/BGD"
+
+  layers:
+    raw:
+      description: "Source parquet files ingested as-is via Redis Streams into MongoDB."
+      collections: [raw_trips, raw_zones]
+
+    clean:
+      description: >
+        dbt models filter out invalid records (bad fares, distances, durations,
+        unknown zones) and add derived fields. Data is stored in DuckDB and then
+        exported to MongoDB.
+      collections: [clean_trips, clean_zones]
+
+    gold:
+      description: "Pre-aggregated analytics tables ready for direct consumption."
+      collections: [gold_zone_revenue, gold_hourly_demand, gold_top_routes]
+
+# -----------------------------------------------------------------------------
+# SCHEMA  (reflects the 4 exported CSV files in data_product/)
+# -----------------------------------------------------------------------------
+
+schema:
+  gold_zone_revenue:
+    file: "gold_zone_revenue.csv"
+    description: "Revenue and trip statistics aggregated by pickup zone (~260 rows)."
+    primary_key: location_id
+    columns:
+      - name: location_id
+        type: integer
+        description: "Pickup zone LocationID. Unique, matches clean_zones.LocationID."
+        nullable: false
+        example: 132
+
+      - name: pickup_zone
+        type: string
+        description: "Zone name."
+        nullable: true
+        example: "JFK Airport"
+
+      - name: borough
+        type: string
+        description: "NYC borough of the pickup zone."
+        nullable: true
+        example: "Queens"
+
+      - name: is_airport
+        type: boolean
+        description: "TRUE if the zone is an airport."
+        nullable: true
+        example: true
+
+      - name: trip_count
+        type: integer
+        description: "Total number of trips originating from this zone."
+        nullable: false
+        example: 450210
+
+      - name: total_revenue
+        type: float
+        description: "Sum of total_amount for all trips from this zone, rounded to 2 decimals."
+        nullable: false
+        example: 18234567.89
+
+      - name: avg_fare
+        type: float
+        description: "Average fare_amount for trips from this zone, rounded to 2 decimals."
+        nullable: true
+        example: 38.42
+
+      - name: avg_tip_pct
+        type: float
+        description: "Average tip percentage for trips from this zone, rounded to 2 decimals."
+        nullable: true
+        example: 15.3
+
+      - name: avg_distance_miles
+        type: float
+        description: "Average trip distance in miles, rounded to 2 decimals."
+        nullable: true
+        example: 14.7
+
+      - name: avg_duration_min
+        type: float
+        description: "Average trip duration in minutes, rounded to 2 decimals."
+        nullable: true
+        example: 42.5
+
+  gold_hourly_demand:
+    file: "gold_hourly_demand.csv"
+    description: "Trip demand and averages aggregated by hour of day (exactly 24 rows)."
+    primary_key: pickup_hour
+    columns:
+      - name: pickup_hour
+        type: integer
+        description: "Hour of day (0-23). Unique, covers all 24 hours."
+        nullable: false
+        example: 18
+
+      - name: trip_count
+        type: integer
+        description: "Total number of trips starting in this hour across 2022-2023."
+        nullable: false
+        example: 1243567
+
+      - name: avg_distance_miles
+        type: float
+        description: "Average trip distance in miles for this hour, rounded to 2 decimals."
+        nullable: true
+        example: 3.1
+
+      - name: avg_revenue
+        type: float
+        description: "Average total_amount for trips in this hour, rounded to 2 decimals."
+        nullable: true
+        example: 18.45
+
+      - name: avg_duration_min
+        type: float
+        description: "Average trip duration in minutes for this hour, rounded to 2 decimals."
+        nullable: true
+        example: 14.2
+
+  gold_top_routes:
+    file: "gold_top_routes.csv"
+    description: "Top 50 most frequent origin-destination pairs with at least 1,000 trips."
+    primary_key: [pu_location_id, do_location_id]
+    columns:
+      - name: pu_location_id
+        type: integer
+        description: "Pickup zone LocationID."
+        nullable: false
+        example: 132
+
+      - name: do_location_id
+        type: integer
+        description: "Dropoff zone LocationID."
+        nullable: false
+        example: 161
+
+      - name: pickup_zone
+        type: string
+        description: "Pickup zone name."
+        nullable: true
+        example: "JFK Airport"
+
+      - name: dropoff_zone
+        type: string
+        description: "Dropoff zone name."
+        nullable: true
+        example: "Midtown Center"
+
+      - name: trip_count
+        type: integer
+        description: "Total trips on this route. Minimum 1,000."
+        nullable: false
+        example: 87432
+
+      - name: avg_fare
+        type: float
+        description: "Average fare in USD for this route, rounded to 2 decimals."
+        nullable: true
+        example: 56.8
+
+      - name: avg_distance_miles
+        type: float
+        description: "Average trip distance in miles for this route, rounded to 2 decimals."
+        nullable: true
+        example: 17.3
+
+  zone_lookup:
+    file: "zone_lookup.csv"
+    description: "NYC taxi zone reference table (265 rows). Use to decode LocationID values in gold_top_routes."
+    primary_key: LocationID
+    columns:
+      - name: LocationID
+        type: integer
+        description: "Unique zone identifier. Matches pu_location_id / do_location_id in gold_top_routes and location_id in gold_zone_revenue."
+        nullable: false
+        example: 161
+
+      - name: Borough
+        type: string
+        description: "NYC borough. 'EWR' normalized to 'New Jersey'."
+        nullable: false
+        example: "Manhattan"
+
+      - name: Zone
+        type: string
+        description: "Zone name."
+        nullable: false
+        example: "Midtown Center"
+
+      - name: service_zone
+        type: string
+        description: "Service zone classification (e.g., Boro Zone, Yellow Zone)."
+        nullable: true
+        example: "Yellow Zone"
+
+      - name: is_airport
+        type: boolean
+        description: "TRUE for JFK Airport, LaGuardia Airport, and Newark Airport zones."
+        nullable: false
+        example: false
+
+# -----------------------------------------------------------------------------
+# DATA QUALITY METRICS
+# -----------------------------------------------------------------------------
+
+quality_metrics:
+  - metric: "Trip Retention Rate"
+    definition: >
+      Percentage of raw trips that pass all quality filters and appear in
+      clean_trips. Calculated as: (clean_trips row count / raw_trips row count) × 100.
+    current_value: "~86%"
+    threshold: ">= 75%"
+    cadence: "Every pipeline run"
+    enforcement: "Pipeline aborts if threshold is not met (data_quality.py)."
+
+  - metric: "Critical Field Completeness"
+    definition: >
+      Percentage of clean_trips rows where all five critical fields are non-null:
+      PULocationID, DOLocationID, fare_amount, pickup_hour, trip_duration_min.
+      Tested individually via dbt not_null schema tests.
+    current_value: "100%"
+    threshold: "100%"
+    cadence: "Every pipeline run (dbt test phase)"
+    enforcement: "dbt test fails the pipeline if any null is found."
+
+  - metric: "Hourly Demand Row Count"
+    definition: >
+      Number of rows in gold_hourly_demand. Must equal exactly 24 — one row
+      for each hour of the day (0-23). A missing hour would indicate data loss
+      or aggregation failure.
+    current_value: "24"
+    threshold: "= 24"
+    cadence: "Every pipeline run"
+    enforcement: "dbt not_null + unique tests on pickup_hour; manually verifiable."
+
+  - metric: "Zone Uniqueness in Gold Revenue"
+    definition: >
+      Percentage of unique location_id values in gold_zone_revenue.
+      Duplicate location_ids would indicate an aggregation defect and inflate
+      revenue figures for affected zones.
+    current_value: "100%"
+    threshold: "100%"
+    cadence: "Every pipeline run (dbt unique test)"
+    enforcement: "dbt unique test on location_id fails the pipeline on duplicates."
+
+  - metric: "Fare Amount Validity"
+    definition: >
+      Percentage of clean_trips rows where fare_amount is within the accepted
+      range [0, 500] USD. Trips outside this range are removed during the
+      clean layer transformation.
+    current_value: "100%"
+    threshold: "100%"
+    cadence: "Every pipeline run"
+    enforcement: "WHERE clause in clean_trips.sql filters all invalid fares."
+
+  - metric: "Data Freshness"
+    definition: >
+      Time elapsed since the last recorded successful pipeline run, tracked in
+      the pipeline_runs MongoDB collection. Indicates whether the gold layer
+      reflects a recent successful execution.
+    current_value: "Recorded per run in pipeline_runs collection"
+    threshold: "< 7 days"
+    cadence: "After each pipeline run"
+    enforcement: "Manual check; pipeline_runs.status must equal 'SUCCESS'."
+
+# -----------------------------------------------------------------------------
+# REFRESH FREQUENCY
+# -----------------------------------------------------------------------------
+
+refresh:
+  type: "Batch (full rebuild)"
+  cadence: "On demand / when new NYC TLC data is released (monthly)"
+  execution_time: "< 30 minutes (end-to-end)"
+  idempotency: >
+    Raw layer skips ingestion if already populated. Clean and gold layers are
+    rebuilt from source on each run (delete + bulk insert for clean_trips;
+    upsert by primary key for gold collections).
+
+# -----------------------------------------------------------------------------
+# ACCESS METHOD
+# -----------------------------------------------------------------------------
+
+access:
+  database: "MongoDB"
+  host: "localhost (Docker container, port 27017)"
+  database_name: "bgd_taxidb"
+  auth: "None (local development)"
+
+  python_example: |
+    from pymongo import MongoClient
+    import pandas as pd
+
+    client = MongoClient("mongodb://localhost:27017/")
+    db = client["bgd_taxidb"]
+
+    # Top 10 zones by total revenue
+    docs = db["gold_zone_revenue"].find(
+        {},
+        {"_id": 0, "pickup_zone": 1, "borough": 1, "total_revenue": 1, "trip_count": 1}
+    ).sort("total_revenue", -1).limit(10)
+    df = pd.DataFrame(list(docs))
+    print(df)
+
+    # Hourly demand profile
+    docs = db["gold_hourly_demand"].find({}, {"_id": 0}).sort("pickup_hour", 1)
+    hourly_df = pd.DataFrame(list(docs))
+    print(hourly_df)
+
+  sql_duckdb_example: |
+    -- Requires access to the taxi_etl.duckdb file
+    ATTACH 'taxi_etl.duckdb' AS taxi;
+
+    -- Top 10 revenue zones
+    SELECT pickup_zone, borough, total_revenue, trip_count
+    FROM taxi.gold_zone_revenue
+    ORDER BY total_revenue DESC
+    LIMIT 10;
+
+    -- Hourly demand trend
+    SELECT pickup_hour, trip_count, avg_revenue
+    FROM taxi.gold_hourly_demand
+    ORDER BY pickup_hour;
+
+# -----------------------------------------------------------------------------
+# KNOWN LIMITATIONS
+# -----------------------------------------------------------------------------
+
+limitations:
+  - id: L1
+    description: >
+      Data covers only NYC Yellow Taxi trips for 2022-2023. Green taxi, FHV
+      (Uber, Lyft), and HVFHV records are excluded. Results do not represent
+      the full NYC for-hire vehicle market.
+
+  - id: L2
+    description: >
+      ~14% of raw trips are dropped during cleaning due to invalid fares,
+      extreme distances, invalid passenger counts, or unrecognized zone IDs.
+      These records are not recoverable from the gold layer.
+
+  - id: L3
+    description: >
+      gold_top_routes is limited to the top 50 routes with at least 1,000 trips.
+      Infrequent origin-destination pairs are excluded.
+
+  - id: L4
+    description: >
+      Schema drift: congestion_surcharge and airport_fee columns are absent in
+      some 2022 parquet files. They are coalesced to 0.0, which may slightly
+      understate total charges for early 2022 records.
+
+  - id: L5
+    description: >
+      The pipeline runs locally via Docker Compose. There is no cloud deployment
+      or public API endpoint. Access requires cloning the repository and running
+      Docker Compose with the source parquet files present.
+
+  - id: L6
+    description: >
+      Temporal aggregations (gold_hourly_demand) span both years combined.
+      Year-over-year comparisons must be derived from clean_trips directly.
